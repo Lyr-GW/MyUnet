@@ -6,9 +6,6 @@ import config
 
 
 transform_args = transforms.Compose([
-
-])
-train_augs = transforms.Compose([
     transforms.Resize([2848, 4288]),
     transforms.RandomCrop([512,512]),
     transforms.ToTensor(),
@@ -20,7 +17,7 @@ train_loader=DataLoader(
         labels_root=config.ROOT_DIR+config.ORIGIN_TRAIN_OD_GT,
         # inputs_root=config.TRAINING_PATH,
         # labels_root=config.TRAINING_GT_PATH,
-        transform=train_augs,
+        transform=transform_args,
     ),
     batch_size=config.BATCH_SIZE,
     shuffle=False,
@@ -34,7 +31,7 @@ DDR_train_loader=DataLoader(
     dataset=DDRDataset(
         inputs_root=config.DDR_ROOT_DIR+config.DDR_TRAIN_IMG,
         labels_root=config.DDR_ROOT_DIR+config.DDR_TRAIN_GT,
-        transform=train_augs,
+        transform=transform_args,
     ),
     batch_size=config.BATCH_SIZE,
     shuffle=False,
@@ -46,7 +43,7 @@ DDR_valid_loader=DataLoader(
         inputs_root=config.DDR_ROOT_DIR+config.DDR_VALID_IMG,
         # vessels_root=config.DDR_ROOT_DIR+config.DDR_VALID_VSL,  #血管信息
         labels_root=config.DDR_ROOT_DIR+config.DDR_VALID_GT,
-        transform=train_augs,
+        transform=transform_args,
     ),
     batch_size=config.BATCH_SIZE,
     shuffle=False,
@@ -58,7 +55,7 @@ DDR_test_loader=DataLoader(
         inputs_root=config.DDR_ROOT_DIR+config.DDR_TEST_IMG,
         # vessels_root=config.DDR_ROOT_DIR+config.DDR_TEST_VSL,  #血管信息
         labels_root=config.DDR_ROOT_DIR+config.DDR_TEST_GT,
-        transform=train_augs,
+        transform=transform_args,
     ),
     batch_size=config.BATCH_SIZE,
     shuffle=False,

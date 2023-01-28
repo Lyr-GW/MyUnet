@@ -13,6 +13,18 @@ class ConvBlock(nn.Module):
         out = self.layer1(input)
         return out
 
+class ConvBlock_Last(nn.Module):
+    def __init__(self, in_ch, out_ch):
+        super(ConvBlock, self).__init__()
+        self.layer1 = nn.Sequential(
+            nn.Conv2d(in_ch, out_ch, kernel_size=1, padding=1),
+            nn.BatchNorm2d(out_ch),
+            nn.ReLU(inplace=True)
+        )
+    def forward(self, input):
+        out = self.layer1(input)
+        return out
+
 class Triple_Branches(nn.Module):
     def __init__(self):
         super(Triple_Branches, self).__init__()
@@ -35,8 +47,8 @@ class Triple_Branches(nn.Module):
         self.up_conv4 = ConvBlock(256,64)
         self.down_conv4 = ConvBlock(256,64)
 
-        self.up_conv5 = ConvBlock(64,2)
-        self.down_conv5 = ConvBlock(64,1)
+        self.up_conv5 = ConvBlock_Last(64,2)
+        self.down_conv5 = ConvBlock_Last(64,1)
 
     def forward(self, x):
         up_c1 = self.up_conv1(x)
