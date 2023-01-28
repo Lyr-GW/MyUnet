@@ -112,9 +112,6 @@ def train(model, train_loader, valid_loader, style_loss, lesion_loss, ref_img, o
 
                 #统计训练loss
                 #12.27  如何综合血管和病灶loss
-                train_loss += loss_style.item() + loss_lesion.item()
-                train_step += 1
-
 
                 loss = loss_style + loss_lesion
                 # loss.backward()
