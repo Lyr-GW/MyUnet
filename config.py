@@ -13,9 +13,10 @@ TRAINING_GT_PATH = '/home/unet/data/A. Segmentation/1. Original Images/a. Traini
 
 
 # DDR_ROOT_DIR = '/home/linwei/UNet/data/lesion_segmentation'
-DDR_ROOT_DIR = '../data/lesion_segmentation'
+DDR_ROOT_DIR = '../lesion_segmentation'
 
 REF_IMG = '/ref_img.gif'
+TEST_IMAGE_PATH = '../lesion_segmentation/valid/image/007-2846-100.jpg'
 
 DDR_TRAIN_IMG = '/train/image'
 DDR_TRAIN_VSL = '/train/vessels'

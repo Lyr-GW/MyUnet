@@ -8,6 +8,8 @@ from triple_branches import Triple_Branches
 from dataloader import transform_args 
 import matplotlib.pyplot as plt
 
+import config
+
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -17,7 +19,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = Triple_Branches()
 model_path = './checkpoint.pth'
 model.load_state_dict(torch.load(model_path, map_location=device))
-test_image_path = '../lesion_segmentation/valid/image/007-2846-100.jpg'
+test_image_path = config.TEST_IMAGE_PATH
 test_image = Image.open(test_image_path).convert('RGB')
 print('Operating...')
 img = transform_args(test_image)

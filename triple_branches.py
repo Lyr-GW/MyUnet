@@ -15,9 +15,9 @@ class ConvBlock(nn.Module):
 
 class ConvBlock_Last(nn.Module):
     def __init__(self, in_ch, out_ch):
-        super(ConvBlock, self).__init__()
+        super(ConvBlock_Last, self).__init__()
         self.layer1 = nn.Sequential(
-            nn.Conv2d(in_ch, out_ch, kernel_size=1, padding=1),
+            nn.Conv2d(in_ch, out_ch, kernel_size=3, padding=1),
             nn.BatchNorm2d(out_ch),
             nn.ReLU(inplace=True)
         )
