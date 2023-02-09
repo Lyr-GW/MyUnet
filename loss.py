@@ -27,9 +27,16 @@ class DiceBCELoss(nn.Module):
         result = self.weight_ce * ce_loss + (1 - self.weight_ce) * dc_loss
         return result
 
+# def gram_matrix(y):
+	# (ch, h, w) = y.size()
+	# features = y.view(1, ch, w * h)
+	# features_t = features.transpose(1, 2)
+	# gram = features.bmm(features_t) / (ch * h * w)
+	# return gram
+
 def gram_matrix(y):
-	(ch, h, w) = y.size()
-	features = y.view(1, ch, w * h)
+	(b, ch, h, w) = y.size()
+	features = y.view(b, ch, w * h)
 	features_t = features.transpose(1, 2)
 	gram = features.bmm(features_t) / (ch * h * w)
 	return gram

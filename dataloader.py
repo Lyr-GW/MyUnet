@@ -6,8 +6,7 @@ import config
 
 
 transform_args = transforms.Compose([
-    transforms.Resize([2848, 4288]),
-    transforms.RandomCrop([512,512]),
+    transforms.Resize([512, 512]),
     transforms.ToTensor(),
 ])
 #训练集loader

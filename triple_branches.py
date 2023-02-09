@@ -47,7 +47,7 @@ class Triple_Branches(nn.Module):
         self.up_conv4 = ConvBlock(256,64)
         self.down_conv4 = ConvBlock(256,64)
 
-        self.up_conv5 = ConvBlock_Last(64,2)
+        self.up_conv5 = ConvBlock_Last(64,1)
         self.down_conv5 = ConvBlock_Last(64,1)
 
     def forward(self, x):

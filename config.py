@@ -13,29 +13,29 @@ TRAINING_GT_PATH = '/home/unet/data/A. Segmentation/1. Original Images/a. Traini
 
 
 # DDR_ROOT_DIR = '/home/linwei/UNet/data/lesion_segmentation'
-DDR_ROOT_DIR = '../lesion_segmentation'
+DDR_ROOT_DIR = '../data/lesion_segmentation'
 
 REF_IMG = '/ref_img.gif'
-TEST_IMAGE_PATH = '../lesion_segmentation/valid/image/007-2846-100.jpg'
+TEST_IMAGE_PATH = '../data/lesion_segmentation/valid/image/007-2846-100.jpg'
 
 DDR_TRAIN_IMG = '/train/image'
 DDR_TRAIN_VSL = '/train/vessels'
-DDR_TRAIN_GT = '/train/label/SE'
+DDR_TRAIN_GT = '/train/label/EX'
 
 DDR_VALID_IMG = '/valid/image' 
 DDR_VALID_VSL = '/valid/vessels'
-DDR_VALID_GT = '/valid/segmentation label/SE'
+DDR_VALID_GT = '/valid/segmentation label/EX'
 
 DDR_TEST_IMG = '/test/image' 
 DDR_TEST_VSL = '/test/vessels'
-DDR_TEST_GT = '/test/label/SE'
+DDR_TEST_GT = '/test/label/EX'
 
 DDR_TEST_OUT = '/outputs/SE/test'
 
 
 '''Hyper Parameters'''
 BATCH_SIZE = 1
-NUM_WORKERS = 0
-LR = 0.0001
-NUM_EPOCHS = 10
+NUM_WORKERS = 1
+LR = 0.00001
+NUM_EPOCHS = 200
 

@@ -6,13 +6,34 @@ from loss import DiceLoss, DiceBCELoss, StyleLoss
 import pytorch_ssim
 import PIL.Image as Image
 import torchvision.transforms as transforms
+# import matplotlib.pyplot as plt
+# from medpy import metric
 
 import config
-from dataloader import train_loader, DDR_train_loader, DDR_valid_loader
-from unet import UNet
-from dual_unet import Dual_UNet
+from dataloader import DDR_train_loader, DDR_valid_loader
+# from unet import UNet
+# from dual_unet import Dual_UNet
 from triple_branches import Triple_Branches
-from utils import precision
+import utils
+import logging
+
+def get_logger(filename, verbosity=1, name=None):
+    level_dict = {0: logging.DEBUG, 1: logging.INFO, 2: logging.WARNING}
+    formatter = logging.Formatter(
+        "[%(asctime)s][%(filename)s][line:%(lineno)d][%(levelname)s] %(message)s"
+    )
+    logger = logging.getLogger(name)
+    logger.setLevel(level_dict[verbosity])
+ 
+    fh = logging.FileHandler(filename, "w")
+    fh.setFormatter(formatter)
+    logger.addHandler(fh)
+ 
+    sh = logging.StreamHandler()
+    sh.setFormatter(formatter)
+    logger.addHandler(sh)
+ 
+    return logger
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -20,7 +41,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 ref_img = Image.open(config.DDR_ROOT_DIR+config.REF_IMG) 
 ref_img_tensor = transforms.ToTensor()(ref_img)
 ref_img_tensor = ref_img_tensor.unsqueeze(0)
-print(ref_img_tensor.shape)
+# print(ref_img_tensor.shape)
 ref_img_tensor = ref_img_tensor.to(device)
 
 
@@ -33,6 +54,10 @@ def gram_matrix(y):
 
 def train(model, train_loader, valid_loader, style_loss, lesion_loss, ref_img, optimizer, epochs):
     best_score = 1.0
+    logger = get_logger('./log/exp.log')
+    logger.info('start logging...')
+    optimizer.zero_grad()
+
     for epoch in range(epochs):
         epoch_start = time.time()
         # print("Epoch:{}/{}".format(epoch+1, epochs))
@@ -43,26 +68,42 @@ def train(model, train_loader, valid_loader, style_loss, lesion_loss, ref_img, o
         train_loss = 0
         train_step = 0
         val_loss = 0
-        val_precision = 0
+        dice = 0
+        val_dice = 0
+        iou = 0
+        val_iou = 0
+        # precision = 0
+        # accuracy = 0
+        # val_precision = 0
+        # val_accuracy = 0
         val_step = 0
 
-        print(len(train_loader))
-        print(train_loader.dataset)
+        # print(len(train_loader))
+        # print(train_loader.dataset)
         # for i, (inputs, vessels, labels) in enumerate(train_loader):
         for i, (inputs, labels) in enumerate(train_loader):
             inputs = inputs.to(device)
             labels = labels.to(device)
-            optimizer.zero_grad()
             vsl_out, les_out = model(inputs)           #single input
-            loss_style = style_loss(vsl_out, gram_matrix(ref_img))
+            # print("vsl_out shape"+str(vsl_out.shape))
+            # print("les_out shape"+str(les_out.shape))
+            # loss_style = style_loss(vsl_out.unsqueeze(0), gram_matrix(ref_img))
+            # print(f"les_out.shape={les_out.shape},labels.shape={labels.shape}")
             loss_lesion = lesion_loss(les_out, labels)
-            train_loss += loss_style.item() + loss_lesion.item()
+            # train_loss += loss_style.item() + loss_lesion.item()
+            train_loss += loss_lesion.item()
             train_step += 1
 
-            loss = loss_style + loss_lesion
-            loss.backward()
+            # loss = loss_style + loss_lesion
+            # loss.backward()
+            loss_lesion.backward()
+            # if (i+1) % 2 ==0 or (i+1) == len(train_loader):
+            #     if hasattr(torch.cuda, 'empty_cache'): torch.cuda.empty_cache()
             optimizer.step()
-            print("\n[Epoch {}/{}] [Batch {}/{}] [Vessel loss: {}] [Lesion loss: {}]".format(epoch + 1, epochs, i + 1, len(train_loader), loss_style.item(), loss_lesion.item()))
+            optimizer.zero_grad(set_to_none=True)
+            # print("\n[Epoch {}/{}] [Batch {}/{}] [Vessel loss: {}] [Lesion loss: {}]".format(epoch + 1, epochs, i + 1, len(train_loader), loss_style.item(), loss_lesion.item()))
+            # print(f"\n[Epoch {epoch+1}/{epochs}] [Batch {i+1}/{len(train_loader)}] [Lesion Loss: {loss_lesion.item()}]")
+            # logger.info(f"\n[Epoch {epoch+1}/{epochs}] [Batch {i+1}/{len(train_loader)}] [Lesion Loss: {loss_lesion.item()}]")
         
         #设置为验证模式
         model.eval()
@@ -72,28 +113,44 @@ def train(model, train_loader, valid_loader, style_loss, lesion_loss, ref_img, o
                 labels = labels.to(device)
                 vsl_out, les_out = model(inputs)           #single input
 
-                loss_style = style_loss(vsl_out, gram_matrix(ref_img))
+                # loss_style = style_loss(vsl_out.unsqueeze(0), gram_matrix(ref_img))
                 loss_lesion = lesion_loss(les_out, labels)
-                precision = precision(les_out, labels)
-                # train_loss += loss_style.item() + loss_lesion.item()
-                # train_step += 1
+                # 计算IOU/Dice评价指标
+                # dice = metric.dc(les_out.numpy(), labels.numpy())
+                iou = utils.iou_score(les_out, labels)
 
-                loss = loss_style + loss_lesion
-                val_loss += loss_style.item() + loss_lesion.item()
-                val_precision += precision
+                # # 计算准确度 精确度
+                # accuracy = utils.accuracy(les_out, labels)
+                # precision = utils.precision(les_out, labels)
+
+                # loss = loss_style + loss_lesion
+                # val_loss += loss_style.item() + loss_lesion.item()
+                val_loss += loss_lesion.item()
+                val_dice += dice
+                val_iou += iou
+                # val_precision += precision
+                # val_accuracy += accuracy
                 #统计训练loss
                 val_step += 1
         # 分别求出整个epoch的训练loss以及验证指标
         train_loss /= train_step
         val_loss /= val_step
-        val_precision /= val_step
-        print(f"\n[Epoch {epoch+1}/{epochs}] [Train Loss: {train_loss}] [Valid Loss: {val_loss}] [Valid Precision: {val_precision}]")
+        val_dice /= val_step
+        val_iou /= val_step
+        # val_precision /= val_step
+        # val_accuracy /= val_step
+        # print(f"\n[Epoch {epoch+1}/{epochs}] [Train Loss: {train_loss}] [Valid Loss: {val_loss}] [Lesion Accuracy: {val_accuracy}] [Lesion Precision: {val_precision}] ")
+        # print(f"\n[Epoch {epoch+1}/{epochs}] [Train Loss: {train_loss}] [Valid Loss: {val_loss}] [Valid Lesion Dice: {val_dice}] [Valid Lesion IOU: {val_iou}]")
+        # print(f"\n[Epoch {epoch+1}/{epochs}] [Train Loss: {train_loss}] [Valid Loss: {val_loss}] [Valid Lesion IOU: {val_iou}]")
+        logger.info(f"\n[Epoch {epoch+1}/{epochs}] [Train Loss: {train_loss}] [Valid Loss: {val_loss}] [Valid Lesion IOU: {val_iou}]")
+        # logger.info(f"\n[Epoch {epoch+1}/{epochs}] [Train Loss: {train_loss}] ")
         # 如果验证指标比最优值更好，那么保存当前模型参数
         if val_loss < best_score:
             best_score = val_loss
             torch.save(model.state_dict(), "./checkpoint.pth")
 
         epoch_end = time.time()
+    logger.info('end logging.')
 
 
 if __name__ == '__main__':
@@ -109,5 +166,9 @@ if __name__ == '__main__':
     dice_loss = DiceLoss()
     # loss = DiceBCELoss()
     optimizer = torch.optim.Adam(net.parameters(), lr=config.LR)
+
+    # ref_cpu = ref_img_tensor.cpu()
+    # plt.imshow(ref_cpu)
+    # plt.savefig('ref.jpg')
 
     train(net, DDR_train_loader, DDR_valid_loader, style_loss, bce_loss, ref_img_tensor, optimizer, config.NUM_EPOCHS)

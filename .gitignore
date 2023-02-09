@@ -1,4 +1,7 @@
 *.jpg
 ./__pycache__/*
-
+*.jpeg
+*.log
+*.zip
+*.pth
 config.py
