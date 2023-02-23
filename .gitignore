@@ -1,6 +1,10 @@
 *.jpg
 ./__pycache__/*
 *.jpeg
+*.png
 *.zip
 *.pth
+*.pyc
+.vscode/*
+./result/*
 config.py

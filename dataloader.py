@@ -1,14 +1,30 @@
 from torchvision import transforms
+import albumentations
+import albumentations.pytorch
 from torch.utils.data import DataLoader
 from dataset import IDRiDataset, DDRnonDataset, DDRDataset, DDRvDataset
 from PIL import Image
 import config
 
 
-transform_args = transforms.Compose([
-    transforms.Resize([512, 512]),
-    transforms.ToTensor(),
+transform_args = albumentations.Compose([
+    # transforms.Resize([512, 512]),
+    # transforms.ToTensor(),
+    albumentations.Resize(1024,1024), 
+    # albumentations.RandomCrop(224, 224),
+    albumentations.OneOf([
+        albumentations.HorizontalFlip(p=1),
+        albumentations.RandomRotate90(p=1),
+        albumentations.VerticalFlip(p=1)            
+    ], p=1),
+    albumentations.OneOf([
+        albumentations.MotionBlur(p=1),
+        albumentations.OpticalDistortion(p=1),
+        albumentations.GaussNoise(p=1)                 
+    ], p=1),
+    albumentations.pytorch.transforms.ToTensorV2()
 ])
+
 #训练集loader
 train_loader=DataLoader(
     dataset=IDRiDataset(

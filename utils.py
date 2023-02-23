@@ -1,6 +1,14 @@
 import torch
 import numpy
 
+def normalize(x):
+    max_x = torch.max(x)
+    min_x = torch.min(x)
+    n = (x - min_x) / (max_x - min_x)
+    n[n >=0.4 ] =255                            # 转为二值图片
+    n[n < 0.4 ] =0
+    return n
+
 def precision(predict, target):
     if torch.is_tensor(predict):
         predict = torch.sigmoid(predict).data.cpu().numpy()
@@ -60,3 +68,10 @@ def iou_score(output, target):
     union = (output_ | target_).sum()
 
     return (intersection + smooth) / (union + smooth)
+
+def iou(predict, label):
+    smooth = 1e-10
+    intersection = numpy.multiply(predict, label)
+    union = numpy.asarray(predict+label>0, numpy.float32)
+    iou = intersection / (union + smooth)
+    return iou
