@@ -1,5 +1,9 @@
 import time
 
+import os
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:128"
+
 import torch
 import torch.nn as nn
 from loss import DiceLoss, DiceBCELoss, StyleLoss
@@ -8,6 +12,7 @@ import PIL.Image as Image
 import torchvision.transforms as transforms
 # import matplotlib.pyplot as plt
 # from medpy import metric
+from torch.cuda import amp
 
 import config
 from dataloader import DDR_train_loader, DDR_valid_loader
@@ -16,6 +21,7 @@ from dataloader import DDR_train_loader, DDR_valid_loader
 from triple_branches import Triple_Branches
 import utils
 import logging
+import matplotlib.pyplot as plt
 
 def get_logger(filename, verbosity=1, name=None):
     level_dict = {0: logging.DEBUG, 1: logging.INFO, 2: logging.WARNING}
@@ -35,7 +41,12 @@ def get_logger(filename, verbosity=1, name=None):
  
     return logger
 
+# 部分全局对象
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# 判断能否使用自动混合精度
+enable_amp = True if "cuda" in device.type else False
+# 在训练最开始之前实例化一个GradScaler对象
+scaler = amp.GradScaler(enabled=enable_amp)
 
 # 参考图片
 ref_img = Image.open(config.DDR_ROOT_DIR+config.REF_IMG) 
@@ -52,7 +63,8 @@ def gram_matrix(y):
 	gram = features.bmm(features_t) / (ch * h * w)
 	return gram
 
-def train(model, train_loader, valid_loader, style_loss, lesion_loss, ref_img, optimizer, epochs):
+
+def train(model, train_loader, valid_loader, style_loss, lesion_loss, ref_img, optimizer, scheduler, epochs):
     best_score = 1.0
     logger = get_logger('./log/exp.log')
     logger.info('start logging...')
@@ -78,31 +90,45 @@ def train(model, train_loader, valid_loader, style_loss, lesion_loss, ref_img, o
         # val_accuracy = 0
         val_step = 0
 
-        # print(len(train_loader))
-        # print(train_loader.dataset)
-        # for i, (inputs, vessels, labels) in enumerate(train_loader):
+        for name, param in model.named_parameters():
+            if param.grad is not None and torch.isnan(param.grad).any():
+                print("nan gradient found")
+                print("name:", name)
+
         for i, (inputs, labels) in enumerate(train_loader):
             inputs = inputs.to(device)
+            inputs = inputs.float()
             labels = labels.to(device)
+            labels = labels.float()
+            labels = utils.normalize(labels)
+            
+
+
+            # with amp.autocast(enabled=enable_amp):
             vsl_out, les_out = model(inputs)           #single input
+            # les_out = model(inputs)           #single input
             # print("vsl_out shape"+str(vsl_out.shape))
             # print("les_out shape"+str(les_out.shape))
             # loss_style = style_loss(vsl_out.unsqueeze(0), gram_matrix(ref_img))
             # print(f"les_out.shape={les_out.shape},labels.shape={labels.shape}")
+            # print(les_out)
             loss_lesion = lesion_loss(les_out, labels)
             # train_loss += loss_style.item() + loss_lesion.item()
             train_loss += loss_lesion.item()
             train_step += 1
 
+            '''自动混合精度'''
+            # scaler.scale(train_loss).backward()
+            # scaler.step(optimizer)
+            # scaler.update()
+
             # loss = loss_style + loss_lesion
             # loss.backward()
-            loss_lesion.backward()
+            with torch.autograd.detect_anomaly(): # 自动梯度检查
+                loss_lesion.backward()
             # if (i+1) % 2 ==0 or (i+1) == len(train_loader):
-            #     if hasattr(torch.cuda, 'empty_cache'): torch.cuda.empty_cache()
-            optimizer.step()
-            optimizer.zero_grad(set_to_none=True)
-            # print("\n[Epoch {}/{}] [Batch {}/{}] [Vessel loss: {}] [Lesion loss: {}]".format(epoch + 1, epochs, i + 1, len(train_loader), loss_style.item(), loss_lesion.item()))
-            # print(f"\n[Epoch {epoch+1}/{epochs}] [Batch {i+1}/{len(train_loader)}] [Lesion Loss: {loss_lesion.item()}]")
+                # if hasattr(torch.cuda, 'empty_cache'): torch.cuda.empty_cache()
+
             # logger.info(f"\n[Epoch {epoch+1}/{epochs}] [Batch {i+1}/{len(train_loader)}] [Lesion Loss: {loss_lesion.item()}]")
         
         #设置为验证模式
@@ -110,7 +136,9 @@ def train(model, train_loader, valid_loader, style_loss, lesion_loss, ref_img, o
         with torch.no_grad():
             for i, (inputs, labels) in enumerate(valid_loader):
                 inputs = inputs.to(device)
+                inputs = inputs.float()
                 labels = labels.to(device)
+                labels = labels.float()
                 vsl_out, les_out = model(inputs)           #single input
 
                 # loss_style = style_loss(vsl_out.unsqueeze(0), gram_matrix(ref_img))
@@ -142,6 +170,10 @@ def train(model, train_loader, valid_loader, style_loss, lesion_loss, ref_img, o
         # print(f"\n[Epoch {epoch+1}/{epochs}] [Train Loss: {train_loss}] [Valid Loss: {val_loss}] [Lesion Accuracy: {val_accuracy}] [Lesion Precision: {val_precision}] ")
         # print(f"\n[Epoch {epoch+1}/{epochs}] [Train Loss: {train_loss}] [Valid Loss: {val_loss}] [Valid Lesion Dice: {val_dice}] [Valid Lesion IOU: {val_iou}]")
         # print(f"\n[Epoch {epoch+1}/{epochs}] [Train Loss: {train_loss}] [Valid Loss: {val_loss}] [Valid Lesion IOU: {val_iou}]")
+        optimizer.step()
+        optimizer.zero_grad(set_to_none=True)
+        torch.cuda.empty_cache()
+        # scheduler.step(val_loss)
         logger.info(f"\n[Epoch {epoch+1}/{epochs}] [Train Loss: {train_loss}] [Valid Loss: {val_loss}] [Valid Lesion IOU: {val_iou}]")
         # logger.info(f"\n[Epoch {epoch+1}/{epochs}] [Train Loss: {train_loss}] ")
         # 如果验证指标比最优值更好，那么保存当前模型参数
@@ -166,9 +198,11 @@ if __name__ == '__main__':
     dice_loss = DiceLoss()
     # loss = DiceBCELoss()
     optimizer = torch.optim.Adam(net.parameters(), lr=config.LR)
+    # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5, verbose=True, eps=1e-9)
+    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[20,80], gamma=0.1)
 
     # ref_cpu = ref_img_tensor.cpu()
     # plt.imshow(ref_cpu)
     # plt.savefig('ref.jpg')
 
-    train(net, DDR_train_loader, DDR_valid_loader, style_loss, bce_loss, ref_img_tensor, optimizer, config.NUM_EPOCHS)
+    train(net, DDR_train_loader, DDR_valid_loader, style_loss, bce_loss, ref_img_tensor, optimizer, scheduler, config.NUM_EPOCHS)

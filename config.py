@@ -20,22 +20,22 @@ TEST_IMAGE_PATH = '../data/lesion_segmentation/valid/image/007-2846-100.jpg'
 
 DDR_TRAIN_IMG = '/train/image'
 DDR_TRAIN_VSL = '/train/vessels'
-DDR_TRAIN_GT = '/train/label/EX'
+DDR_TRAIN_GT = '/train/label/HE'
 
 DDR_VALID_IMG = '/valid/image' 
 DDR_VALID_VSL = '/valid/vessels'
-DDR_VALID_GT = '/valid/segmentation label/EX'
+DDR_VALID_GT = '/valid/segmentation label/HE'
 
 DDR_TEST_IMG = '/test/image' 
 DDR_TEST_VSL = '/test/vessels'
-DDR_TEST_GT = '/test/label/EX'
+DDR_TEST_GT = '/test/label/HE'
 
 DDR_TEST_OUT = '/outputs/SE/test'
 
 
 '''Hyper Parameters'''
 BATCH_SIZE = 1
-NUM_WORKERS = 1
+NUM_WORKERS = 8
 LR = 0.00001
 NUM_EPOCHS = 200
 
