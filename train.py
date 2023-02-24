@@ -117,7 +117,7 @@ def train(model, train_loader, valid_loader, style_loss, lesion_loss, ref_img, o
                 loss_lesion = lesion_loss(les_out, labels)
                 # 计算IOU/Dice评价指标
                 # dice = metric.dc(les_out.numpy(), labels.numpy())
-                iou = utils.iou_score(les_out, labels)
+                iou = utils.iou(les_out, labels)
 
                 # # 计算准确度 精确度
                 # accuracy = utils.accuracy(les_out, labels)

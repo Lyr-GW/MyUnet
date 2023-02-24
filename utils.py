@@ -1,5 +1,5 @@
 import torch
-import numpy
+import numpy 
 
 def precision(predict, target):
     if torch.is_tensor(predict):
@@ -60,3 +60,10 @@ def iou_score(output, target):
     union = (output_ | target_).sum()
 
     return (intersection + smooth) / (union + smooth)
+
+def iou(predict, label):
+    smooth = 1e-10
+    intersection = numpy.multiply(predict, label)
+    union = numpy.asarray(predict+label>0, numpy.float32)
+    iou = intersection / (union + smooth)
+    return iou
