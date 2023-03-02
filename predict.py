@@ -22,9 +22,6 @@ transform_args = transforms.Compose([
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-iou = 0
-test_iou = 0
-test_step = 0
 
 def predict(index, img):
     model = Triple_Branches()
@@ -64,8 +61,8 @@ def predict(index, img):
         pred_lesion = torch.squeeze(pred_lesion)                      # 将(batch、channel)维度去掉
         pred_lesion = np.array(pred_lesion.data.cpu())                # 保存图片需要转为cpu处理
  
-        pred_lesion[pred_lesion >=0 ] =0                            # 转为二值图片
-        pred_lesion[pred_lesion < 0 ] =255
+        pred_lesion[pred_lesion >=0.4 ] =255                            # 转为二值图片
+        pred_lesion[pred_lesion < 0.4 ] =0
  
         pred_lesion = np.uint8(pred_lesion)                           # 转为图片的形式
         cv2.imwrite(f'./result/cv2/{index}_les.png', pred_lesion)           # 保存图片
@@ -140,6 +137,9 @@ def test_uni(test_loader):
 
 
         
+iou = 0
+test_iou = 0
+test_step = 0
 
 def test(test_loader):
     model = Triple_Branches()
@@ -147,6 +147,10 @@ def test(test_loader):
     model_path = './checkpoint.pth'
     model.load_state_dict(torch.load(model_path, map_location=device))
 
+    iou = 0
+    test_iou = 0
+    test_step = 0
+    
     model.eval()
     with torch.no_grad():
         for i, (inputs, labels) in enumerate(test_loader):
@@ -161,21 +165,28 @@ def test(test_loader):
             test_step += 1
 
             '''图片可视化'''
-            predictions = pred_lesion.data.max(1)[1].squeeze_(1).cpu().numpy()
-            prediction = predictions[0]
-            prediction *= 255
-            # predictions_color = colorize_mask(prediction)
-            plt.imshow(prediction)
-            plt.savefig(f'./result/plt/{inputs.name}_les.jpg')
+            # predictions = pred_lesion.data.max(1)[1].squeeze_(1).cpu().numpy()
+            # prediction = predictions[0]
+            # # prediction *= 255
+            # # predictions_color = colorize_mask(prediction)
+            # plt.imshow(prediction)
+            # plt.savefig(f'./result/plt/{i}_les.jpg')
 
+            # print(pred_lesion)
+            pred_lesion = utils.normalize(pred_lesion)
+            pred_lesion *= 255
+            # print(pred_lesion)
             pred_lesion = torch.squeeze(pred_lesion)                      # 将(batch、channel)维度去掉
             pred_lesion = np.array(pred_lesion.data.cpu())                # 保存图片需要转为cpu处理
  
-            pred_lesion[pred_lesion >=0 ] =0                            # 转为二值图片
-            pred_lesion[pred_lesion < 0 ] =255
+            # pred_lesion[pred_lesion >=0.6 ] =255                            # 转为二值图片
+            # pred_lesion[pred_lesion < 0.6 ] =0
+            # print(pred_lesion)
  
             pred_lesion = np.uint8(pred_lesion)                           # 转为图片的形式
-            cv2.imwrite(f'./result/cv2/{inputs.name}_les.png', pred_lesion)           # 保存图片
+            # print(pred_lesion.shape)
+            cv2.imwrite(f'./result/cv2/{i}_les.png', pred_lesion)           # 保存图片
+
         
         test_iou /= test_step
         print(f"test_iou={test_iou}")
@@ -185,7 +196,8 @@ def test(test_loader):
 
 
 if __name__ == '__main__':
-    test_uni(DDR_test_loader)
+    # test_uni(DDR_test_loader)
+    test(DDR_test_loader)
 
     # test_imgs = os.listdir(config.DDR_ROOT_DIR + config.DDR_TEST_IMG)
     # # item = '007-4679-200.jpg'

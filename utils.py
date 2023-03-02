@@ -4,9 +4,13 @@ import numpy
 def normalize(x):
     max_x = torch.max(x)
     min_x = torch.min(x)
-    n = (x - min_x) / (max_x - min_x)
-    n[n >=0.4 ] =255                            # 转为二值图片
-    n[n < 0.4 ] =0
+    # print(x)
+    n = (x - min_x) / (max_x - min_x + 1e-6)
+    n[n >=0.4 ] = 1                            # 转为二值图片
+    n[n < 0.4 ] = 0
+    # print(f"max--{max_x}, min--{min_x}, max-min--{max_x-min_x+1e-6}, n--{n}")
+    # n[n >=0.4 ] =255                            # 转为二值图片
+    # n[n < 0.4 ] =0
     return n
 
 def precision(predict, target):
