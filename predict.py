@@ -1,5 +1,5 @@
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 import torch
 from torch.autograd import Variable
 from PIL import Image
@@ -16,12 +16,38 @@ import config
 import utils
 
 transform_args = transforms.Compose([
-    transforms.Resize([640, 640]),
+    transforms.Resize([512, 512]),
     transforms.ToTensor(),
 ])
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+def predict_test(index, img_path, model):
+    print('Predicting...')
+
+    img = Image.open(img_path)
+    img = transform_args(img)
+    img = img.unsqueeze(0)
+    img = img.to(device)
+    # img = img.to(device)
+    img = Variable(img)
+
+    model.eval()
+
+    with torch.no_grad():
+        pred_vsl, pred_lesion  = model(img)
+        # pred_lesion  = model(img)
+
+        pred_lesion = utils.normalize(torch.tensor(pred_lesion))
+        pred_lesion = torch.squeeze(pred_lesion)                      # 将(batch、channel)维度去掉
+        pred_lesion = np.array(pred_lesion.data.cpu())                # 保存图片需要转为cpu处理
+ 
+        pred_lesion[pred_lesion >=0.5 ] =255                            # 转为二值图片
+        pred_lesion[pred_lesion < 0.5 ] =0
+ 
+        pred_lesion = np.uint8(pred_lesion)                           # 转为图片的形式
+        cv2.imwrite(f'./result/mid_result/{index}_les.png', pred_lesion)           # 保存图片
+    print('Done')
 
 def predict(index, img):
     model = Triple_Branches()
@@ -173,9 +199,9 @@ def test(test_loader):
             # plt.savefig(f'./result/plt/{i}_les.jpg')
 
             # print(pred_lesion)
-            pred_lesion = utils.normalize(pred_lesion)
-            pred_lesion *= 255
-            # print(pred_lesion)
+            # pred_lesion = utils.normalize(pred_lesion)
+            # pred_lesion *= 255
+            print(pred_lesion)
             pred_lesion = torch.squeeze(pred_lesion)                      # 将(batch、channel)维度去掉
             pred_lesion = np.array(pred_lesion.data.cpu())                # 保存图片需要转为cpu处理
  

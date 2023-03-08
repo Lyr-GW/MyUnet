@@ -27,6 +27,15 @@ class DiceBCELoss(nn.Module):
         result = self.weight_ce * ce_loss + (1 - self.weight_ce) * dc_loss
         return result
 
+class BCELoss(nn.Module):
+    def __init__(self):
+        super(BCELoss, self).__init__()
+
+    def forward(self, pred, target):
+        pred = torch.clamp(pred, min=1e-7, max=1-1e-7)
+        loss = - target * torch.log(pred) - (1-target) * torch.log(1-pred)
+        return loss
+
 # def gram_matrix(y):
 	# (ch, h, w) = y.size()
 	# features = y.view(1, ch, w * h)

@@ -8,7 +8,7 @@ class ConvBlock(nn.Module):
         self.layer1 = nn.Sequential(
             nn.Conv2d(in_ch, out_ch, 3, padding=1),
             nn.BatchNorm2d(out_ch),
-            nn.ReLU(inplace=True)
+            nn.LeakyReLU(inplace=True)
         )
     def forward(self, input):
         out = self.layer1(input)
@@ -20,16 +20,17 @@ class ConvBlock_Last(nn.Module):
         self.layer1 = nn.Sequential(
             nn.Conv2d(in_ch, out_ch, kernel_size=3, padding=1),
             nn.BatchNorm2d(out_ch),
-            nn.ReLU(inplace=True)
+            nn.LeakyReLU(inplace=True)
         )
     def forward(self, input):
         out = self.layer1(input)
         return out
 
 class Up(nn.Module):
-    def __init__(self) -> None:
+    def __init__(self, in_channels) -> None:
         super().__init__()
         self.up = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
+        self.up = nn.ConvTranspose2d(in_channels // 2, in_channels // 2, kernel_size=2, stride=2)
 
     def forward(self, x1, x2):
         x1 = self.up(x1)
@@ -46,8 +47,18 @@ class Triple_Branches(nn.Module):
     def __init__(self):
         super(Triple_Branches, self).__init__()
 
-        self.pool = nn.MaxPool2d(2, 2)
-        self.up = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
+        self.pool = nn.MaxPool2d(2)
+        # self.up = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
+        self.up = nn.ModuleList()
+        self.up_m = nn.ModuleList()
+        up_in_chs = [512, 256, 128, 64]
+        up_m_in_chs = [512, 256, 128, 64]
+        for i in range(4):
+            print(up_in_chs[i])
+            self.up.append(nn.ConvTranspose2d(up_in_chs[i], up_in_chs[i], kernel_size=2, stride=2))
+            self.up_m.append(nn.ConvTranspose2d(up_m_in_chs[i], up_m_in_chs[i], kernel_size=2, stride=2))
+            # self.up[i] = nn.ConvTranspose2d(up_in_chs[i], up_in_chs[i], kernel_size=2, stride=2)
+            # self.up_m[i] = nn.ConvTranspose2d(up_m_in_chs[i], up_m_in_chs[i], kernel_size=2, stride=2)
 
         '''下采样'''
         self.up_conv1 = ConvBlock(3, 64)
@@ -191,41 +202,41 @@ class Triple_Branches(nn.Module):
         # up_cat8 = up_c8+m_c8
         # down_cat8 = down_c8+m_c8
 
-        up_c9 = self.up_conv9(torch.cat([self.up(up_cat5), up_cat4], dim=1))    # 跳层连接
-        down_c9 = self.down_conv9(torch.cat([self.up(down_cat5), down_cat4], dim=1))
+        up_c9 = self.up_conv9(torch.cat([self.up[0](up_cat5), up_cat4], dim=1))    # 跳层连接
+        down_c9 = self.down_conv9(torch.cat([self.up[0](down_cat5), down_cat4], dim=1))
         #中间融合通道
-        mid_cat9 = torch.cat([up_c9, down_c9, self.up(m_c5), m_c4], dim=1)
+        mid_cat9 = torch.cat([up_c9, down_c9, self.up_m[0](m_c5), m_c4], dim=1)
         m_c9 = self.mid_conv9(mid_cat9)
         up_cat9 = up_c9+m_c9
         down_cat9 = down_c9+m_c9
 
-        up_c10 = self.up_conv10(torch.cat([self.up(up_cat9), up_c3], dim=1))    # 跳层连接
-        down_c10 = self.down_conv10(torch.cat([self.up(down_cat9), down_c3], dim=1))
+        up_c10 = self.up_conv10(torch.cat([self.up[1](up_cat9), up_c3], dim=1))    # 跳层连接
+        down_c10 = self.down_conv10(torch.cat([self.up[1](down_cat9), down_c3], dim=1))
         # #中间融合通道
-        mid_cat10 = torch.cat([up_c10, down_c10, self.up(m_c9), m_c3], dim=1)
+        mid_cat10 = torch.cat([up_c10, down_c10, self.up_m[1](m_c9), m_c3], dim=1)
         m_c10 = self.mid_conv10(mid_cat10)
         up_cat10 = up_c10+m_c10
         down_cat10 = down_c10+m_c10
 
-        up_c11 = self.up_conv11(torch.cat([self.up(up_cat10), up_c2], dim=1))    # 跳层连接
-        down_c11 = self.down_conv11(torch.cat([self.up(down_cat10), down_c2], dim=1))
+        up_c11 = self.up_conv11(torch.cat([self.up[2](up_cat10), up_c2], dim=1))    # 跳层连接
+        down_c11 = self.down_conv11(torch.cat([self.up[2](down_cat10), down_c2], dim=1))
         # #中间融合通道
-        mid_cat11 = torch.cat([up_c11, down_c11, self.up(m_c10), m_c2], dim=1)
+        mid_cat11 = torch.cat([up_c11, down_c11, self.up_m[2](m_c10), m_c2], dim=1)
         m_c11 = self.mid_conv11(mid_cat11)
         up_cat11 = up_c11+m_c11
         down_cat11 = down_c11+m_c11
 
         # print(self.up(up_cat9).shape)
         # print(up_c1.shape)
-        up_c12 = self.up_conv12(torch.cat([self.up(up_cat11), up_c1], dim=1))    # 跳层连接
-        down_c12 = self.down_conv12(torch.cat([self.up(down_cat11), down_c1], dim=1))
+        up_c12 = self.up_conv12(torch.cat([self.up[3](up_cat11), up_c1], dim=1))    # 跳层连接
+        down_c12 = self.down_conv12(torch.cat([self.up[3](down_cat11), down_c1], dim=1))
         # #中间融合通道
-        mid_cat12 = torch.cat([up_c12, down_c12, self.up(m_c11), m_c1], dim=1)
+        mid_cat12 = torch.cat([up_c12, down_c12, self.up_m[3](m_c11), m_c1], dim=1)
         m_c12 = self.mid_conv12(mid_cat12)
         up_cat12 = up_c12+m_c12
         down_cat12 = down_c12+m_c12
 
-        vsl_seg = nn.Sigmoid()(up_cat12)
-        lesion_seg = nn.Sigmoid()(down_cat12)
+        vsl_seg = nn.Sigmoid()(up_c12)
+        lesion_seg = nn.Sigmoid()(down_c12)
 
         return vsl_seg, lesion_seg 
