@@ -39,6 +39,7 @@ def predict_test(index, img_path, model):
         # pred_lesion  = model(img)
 
         pred_lesion = utils.normalize(torch.tensor(pred_lesion))
+        # pred_lesion = utils.normalize(torch.clone().detach()(pred_lesion))
         pred_lesion = torch.squeeze(pred_lesion)                      # 将(batch、channel)维度去掉
         pred_lesion = np.array(pred_lesion.data.cpu())                # 保存图片需要转为cpu处理
  
@@ -46,6 +47,8 @@ def predict_test(index, img_path, model):
         pred_lesion[pred_lesion < 0.5 ] =0
  
         pred_lesion = np.uint8(pred_lesion)                           # 转为图片的形式
+        pred_lesion = pred_lesion.transpose(1, 2, 0)
+        print(pred_lesion.shape)
         cv2.imwrite(f'./result/mid_result/{index}_les.png', pred_lesion)           # 保存图片
     print('Done')
 

@@ -47,7 +47,7 @@ def get_logger(filename, verbosity=1, name=None):
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # device = torch.device("cuda")
 # print(f"current using device --- {device}")
-writer = SummaryWriter(log_dir="runs/0307_unet_13.33")
+writer = SummaryWriter(log_dir="runs/0422_2.30")
 # 判断能否使用自动混合精度
 # enable_amp = True if "cuda" in device.type else False
 # 在训练最开始之前实例化一个GradScaler对象
@@ -77,7 +77,6 @@ def train(model, train_loader, valid_loader, style_loss, lesion_loss, ref_img, o
 
     for epoch in range(epochs):
         epoch_start = time.time()
-        print("------------------------------------")
         print(f"------------epoch{epoch+1}-----------------")
         # print("Epoch:{}/{}".format(epoch+1, epochs))
         # print(train_loader.__len__())
@@ -85,6 +84,8 @@ def train(model, train_loader, valid_loader, style_loss, lesion_loss, ref_img, o
         #设置训练模式
         model.train()
         train_loss = 0
+        # loss_style = 0
+        # loss_lesion = 0
         train_iou = 0
         train_step = 0
         val_loss = 0
@@ -98,39 +99,21 @@ def train(model, train_loader, valid_loader, style_loss, lesion_loss, ref_img, o
         # val_accuracy = 0
         val_step = 0
 
-        # for name, param in model.named_parameters():
-        #     if param.grad is not None and torch.isnan(param.grad).any():
-        #         print("nan gradient found")
-        #         print("name:", name)
-
         for i, (inputs, labels) in enumerate(train_loader):
             inputs = inputs.to(device)
             inputs = inputs.float()
             labels = labels.to(device)
-            labels = labels.float()
 
             # with amp.autocast(enabled=enable_amp):
-            vsl_out, les_out = model(inputs)           #single input
+
+            vsl_out, les_out = model(inputs)           
             labels = utils.binarize(labels)
-            # les_out = model(inputs)           #single input
-            # print("vsl_out shape"+str(vsl_out.shape))
-            # print("les_out shape"+str(les_out.shape))
-            # loss_style = style_loss(vsl_out.unsqueeze(0), gram_matrix(ref_img))
-            # print(f"les_out.shape={les_out.shape},labels.shape={labels.shape}")
-            print(f"---{i}--------------------------------")
-            print(f"les_out={les_out}")
-            print("--------------------------------------")
-            print(f"labels={labels}")
-            print("--------------------------------------")
+            loss_style = style_loss(vsl_out.unsqueeze(0), gram_matrix(ref_img))
             loss_lesion = lesion_loss(les_out, labels)
-            # les_out = utils.normalize(les_out)
             iou = utils.iou_score(les_out, labels)
-            print(f"iou={iou}")
-            print("--------------------------------------")
             train_iou += iou
             # train_loss += loss_style.item() + loss_lesion.item()
-            # print(f"loss_lesion shape--{loss_lesion.type}")
-            train_loss += loss_lesion.item()
+            # train_loss += loss_lesion.item()
             train_step += 1
 
             '''自动混合精度'''
@@ -138,12 +121,9 @@ def train(model, train_loader, valid_loader, style_loss, lesion_loss, ref_img, o
             # scaler.step(optimizer)
             # scaler.update()
 
-            # loss = loss_style + loss_lesion
-            # loss.backward()
-            # with torch.autograd.detect_anomaly(): # 自动梯度检查
-            loss_lesion.backward()
-            # if (i+1) % 2 ==0 or (i+1) == len(train_loader):
-                # if hasattr(torch.cuda, 'empty_cache'): torch.cuda.empty_cache()
+            train_loss = loss_style + loss_lesion
+            train_loss.backward()
+            # loss_lesion.backward()
 
             # logger.info(f"\n[Epoch {epoch+1}/{epochs}] [Batch {i+1}/{len(train_loader)}] [Lesion Loss: {loss_lesion.item()}]")
         
@@ -156,15 +136,14 @@ def train(model, train_loader, valid_loader, style_loss, lesion_loss, ref_img, o
                 inputs = inputs.to(device)
                 inputs = inputs.float()
                 labels = labels.to(device)
-                labels = labels.float()
+                # labels = labels.float()
                 vsl_out, les_out = model(inputs)           #single input
                 labels = utils.binarize(labels)
                 y_true.append(labels)
                 y_pred.append(les_out)
 
-                # loss_style = style_loss(vsl_out.unsqueeze(0), gram_matrix(ref_img))
+                loss_style = style_loss(vsl_out.unsqueeze(0), gram_matrix(ref_img))
                 loss_lesion = lesion_loss(les_out, labels)
-                # les_out = utils.normalize(les_out)
                 # 计算IOU评价指标
                 iou = utils.iou_score(les_out, labels)
 
@@ -173,8 +152,8 @@ def train(model, train_loader, valid_loader, style_loss, lesion_loss, ref_img, o
                 # precision = utils.precision(les_out, labels)
 
                 # loss = loss_style + loss_lesion
-                # val_loss += loss_style.item() + loss_lesion.item()
-                val_loss += loss_lesion.item()
+                val_loss += loss_style.item() + loss_lesion.item()
+                # val_loss += loss_lesion.item()
                 val_dice += dice
                 val_iou += iou
                 # val_precision += precision
@@ -202,20 +181,26 @@ def train(model, train_loader, valid_loader, style_loss, lesion_loss, ref_img, o
         logger.info(f"\n[Epoch {epoch+1}/{epochs}] [Train Loss: {train_loss}] [Train IoU: {train_iou}] [Valid Loss: {val_loss}] [Valid Lesion IoU: {val_iou}]")
 
         # print("drawing roc curve")
-        fpr, tpr, roc_auc = utils.calculate_roc(model, valid_loader)
-        # 画ROC曲线
-        plt.figure()
-        lw = 2  # 线宽
-        plt.plot(fpr, tpr, color='darkorange',
-         lw=lw, label='ROC curve (AUC = %0.2f)' % roc_auc)  # 绘制ROC曲线
-        plt.plot([0, 1], [0, 1], color='navy', lw=lw, linestyle='--')  # 绘制对角线
-        plt.xlim([0.0, 1.0])  # x轴的范围
-        plt.ylim([0.0, 1.05])  # y轴的范围
-        plt.xlabel('False Positive Rate')  # x轴的标签
-        plt.ylabel('True Positive Rate')  # y轴的标签
-        plt.title('Receiver operating characteristic example')  # 标题
-        plt.legend(loc="lower right")  # 图例
-        plt.show()  # 展
+        # if(epoch+1 >= 50 and epoch+1 % 25 ==0):
+        # if((epoch+1) % 5 == 0 or epoch == 0):
+        #     print("begin cal roc")
+        #     fpr, tpr, roc_auc = utils.calculate_roc(model, valid_loader)
+        #     # 画ROC曲线
+        #     plt.figure()
+        #     lw = 2  # 线宽
+        #     plt.plot(fpr, tpr, color='darkorange',
+        #      lw=lw, label='ROC curve (AUC = %0.2f)' % roc_auc)  # 绘制ROC曲线
+        #     plt.plot([0, 1], [0, 1], color='navy', lw=lw, linestyle='--')  # 绘制对角线
+        #     plt.xlim([0.0, 1.0])  # x轴的范围
+        #     plt.ylim([0.0, 1.05])  # y轴的范围
+        #     plt.xlabel('False Positive Rate')  # x轴的标签
+        #     plt.ylabel('True Positive Rate')  # y轴的标签
+        #     plt.title('Receiver operating characteristic example')  # 标题
+        #     plt.legend(loc="lower right")  # 图例
+        #     # plt.show()  # 展
+        #     # plt.draw()
+        #     plt.savefig(f"./result/roc/epoch_{epoch+1}.jpeg")
+        #     print("roc done")
 
         #tensorboard添加监视值
         writer.add_scalar('Loss/train', train_loss, epoch)
@@ -231,8 +216,6 @@ def train(model, train_loader, valid_loader, style_loss, lesion_loss, ref_img, o
             torch.save(model.state_dict(), "./checkpoint.pth")
         
         epoch_end = time.time()
-        print("------------------------------------")
-        print("------------------------------------")
     logger.info('end logging.')
 
 
@@ -241,7 +224,7 @@ if __name__ == '__main__':
     # net = Dual_UNet(in_ch = 3, vsl_ch = 4, out_ch = 2)
     net = Triple_Branches()
     net.to(device)
-    print(net)
+    # print(net)
     # loss = nn.CrossEntropyLoss()
     bce_loss = nn.BCELoss()
     # bce_loss = BCELoss()
@@ -251,8 +234,9 @@ if __name__ == '__main__':
     dice_loss = DiceLoss()
     # loss = DiceBCELoss()
     optimizer = torch.optim.Adam(net.parameters(), lr=config.LR)
+    # optimizer = torch.optim.SGD(net.parameters(), lr=config.LR, momentum=0.9)
     # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5, verbose=True, eps=1e-9)
-    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[20,80], gamma=0.1)
+    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[80,140], gamma=0.1)
 
     # ref_cpu = ref_img_tensor.cpu()
     # plt.imshow(ref_cpu)

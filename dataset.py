@@ -3,6 +3,7 @@ import os
 
 from matplotlib import pyplot as plt
 from PIL import Image
+import cv2
 from torch.utils.data import Dataset
 
 class IDRiDataset(Dataset):
@@ -59,16 +60,27 @@ class DDRDataset(Dataset):
         self.transform = transform
 
     def __getitem__(self, index):
-        inputs = plt.imread(self.files[index % len(self.files)])
-        labels = plt.imread(self.files_using[index % len(self.files_using)])
+        # inputs = plt.imread(self.files[index % len(self.files)])
+        inputs = cv2.imread(self.files[index % len(self.files)])
+        # cv2.imwrite('input_cv2.png', inputs)
+        inputs = cv2.cvtColor(inputs, cv2.COLOR_BGR2RGB) # opencv 读入的图像默认以BGR（蓝、绿、红）的方式存储，此处为了符合常识转为RGB
+        # labels = cv2.imread(self.files_using[index % len(self.files_using)], -1)
+        labels = cv2.imread(self.files_using[index % len(self.files_using)])
+        labels = cv2.cvtColor(labels, cv2.COLOR_BGR2RGB) # opencv 读入的图像默认以BGR（蓝、绿、红）的方式存储，此处为了符合常识转为RGB
+        # labels = cv2.imread(self.files_using[index % len(self.files_using)], -1)
+        # inputs = cv2.cvtColor(inputs, cv2.COLOR_BGR2GRAY) # opencv 读入的图像默认以BGR（蓝、绿、红）的方式存储，此处为了符合常识转为RGB
         if self.transform:
             inputs = self.transform(image=inputs)['image']
             labels = self.transform(image=labels)['image']
+            # augments = self.transform(image=inputs, mask=labels)
+            # augments['image'] = augments['image'].numpy().transpose((1, 2, 0))
+            # cv2.imwrite('augments_image_cv2.png', augments['image'])
             # labels = augmented['lmage']
         # if self.transform is not None:
         #     inputs = self.transform(Image.fromarray(inputs))
         #     labels = self.transform(Image.fromarray(labels))
         return inputs, labels
+        # return augments['image'], augments['mask']
 
     def __len__(self):
         return len(self.files)
@@ -80,9 +92,6 @@ class DDRvDataset(Dataset):
         self.vessels = sorted(glob.glob(f'{vessels_root}/*.tif'))
         self.files_using = sorted(glob.glob(f'{labels_root}/*.tif'))
         self.transform = transform
-
-
-
 
     def __getitem__(self, index):
         inputs = plt.imread(self.files[index % len(self.files)])

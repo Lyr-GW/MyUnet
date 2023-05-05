@@ -34,8 +34,8 @@ DDR_TEST_OUT = '/outputs/SE/test'
 
 
 '''Hyper Parameters'''
-BATCH_SIZE = 1
-NUM_WORKERS = 8
-LR = 0.00001
+BATCH_SIZE = 2
+NUM_WORKERS = 2
+LR = 0.0001
 NUM_EPOCHS = 200
 

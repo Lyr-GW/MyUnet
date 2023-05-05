@@ -8,6 +8,8 @@ class ConvBlock(nn.Module):
         self.layer1 = nn.Sequential(
             nn.Conv2d(in_ch, out_ch, 3, padding=1),
             nn.BatchNorm2d(out_ch),
+            # nn.Conv2d(out_ch, out_ch, 3, padding=1),
+            # nn.BatchNorm2d(out_ch),
             nn.LeakyReLU(inplace=True)
         )
     def forward(self, input):
@@ -110,9 +112,9 @@ class Triple_Branches(nn.Module):
         self.down_conv11 = ConvBlock(256, 64)
         self.mid_conv11 = ConvBlock(384, 64)
         
-        self.up_conv12 = ConvBlock_Last(128, 1)
-        self.down_conv12 = ConvBlock_Last(128, 1)
-        self.mid_conv12 = ConvBlock_Last(130, 1)
+        self.up_conv12 = ConvBlock_Last(128, 3)
+        self.down_conv12 = ConvBlock_Last(128, 3)
+        self.mid_conv12 = ConvBlock_Last(134, 1)
     
 
     def forward(self, x):

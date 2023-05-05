@@ -159,5 +159,5 @@ def roc_c(y_true, y_pred):
     plt.ylabel('True Positive Rate')  # y轴的标签
     plt.title('Receiver operating characteristic example')  # 标题
     plt.legend(loc="lower right")  # 图例
-    plt.show()  # 展
+    plt.show()  # 展示
     #增加保存图像代码
