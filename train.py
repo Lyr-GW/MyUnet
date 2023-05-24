@@ -24,6 +24,7 @@ from triple_branches import Triple_Branches
 import utils
 import logging
 from predict import predict_test
+from torchviz import make_dot
 
 def get_logger(filename, verbosity=1, name=None):
     level_dict = {0: logging.DEBUG, 1: logging.INFO, 2: logging.WARNING}
@@ -46,8 +47,8 @@ def get_logger(filename, verbosity=1, name=None):
 # 部分全局对象
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # device = torch.device("cuda")
-# print(f"current using device --- {device}")
-writer = SummaryWriter(log_dir="runs/0422_2.30")
+print(f"current using device --- {device}")
+writer = SummaryWriter(log_dir=f"new_runs/0522_{config.NUM_EPOCHS}epochs")
 # 判断能否使用自动混合精度
 # enable_amp = True if "cuda" in device.type else False
 # 在训练最开始之前实例化一个GradScaler对象
@@ -84,13 +85,15 @@ def train(model, train_loader, valid_loader, style_loss, lesion_loss, ref_img, o
         #设置训练模式
         model.train()
         train_loss = 0
-        # loss_style = 0
-        # loss_lesion = 0
+        train_loss_style = 0
+        train_loss_lesion = 0
         train_iou = 0
         train_step = 0
         val_loss = 0
-        dice = 0
-        val_dice = 0
+        val_loss_style = 0
+        val_loss_lesion = 0
+        # dice = 0
+        # val_dice = 0
         iou = 0
         val_iou = 0
         # precision = 0
@@ -107,6 +110,10 @@ def train(model, train_loader, valid_loader, style_loss, lesion_loss, ref_img, o
             # with amp.autocast(enabled=enable_amp):
 
             vsl_out, les_out = model(inputs)           
+            # # 模型结构可视化pdf
+            # g = make_dot(model(inputs), params=dict(model.named_parameters()))        
+            # g.view()
+
             labels = utils.binarize(labels)
             loss_style = style_loss(vsl_out.unsqueeze(0), gram_matrix(ref_img))
             loss_lesion = lesion_loss(les_out, labels)
@@ -114,15 +121,18 @@ def train(model, train_loader, valid_loader, style_loss, lesion_loss, ref_img, o
             train_iou += iou
             # train_loss += loss_style.item() + loss_lesion.item()
             # train_loss += loss_lesion.item()
-            train_step += 1
 
             '''自动混合精度'''
             # scaler.scale(train_loss).backward()
             # scaler.step(optimizer)
             # scaler.update()
 
-            train_loss = loss_style + loss_lesion
-            train_loss.backward()
+            loss = loss_style + loss_lesion
+            train_loss_style += loss_style
+            train_loss_lesion += loss_lesion
+
+            loss.backward()
+            train_loss += loss.item()
             # loss_lesion.backward()
 
             # logger.info(f"\n[Epoch {epoch+1}/{epochs}] [Batch {i+1}/{len(train_loader)}] [Lesion Loss: {loss_lesion.item()}]")
@@ -153,24 +163,31 @@ def train(model, train_loader, valid_loader, style_loss, lesion_loss, ref_img, o
 
                 # loss = loss_style + loss_lesion
                 val_loss += loss_style.item() + loss_lesion.item()
+                val_loss_lesion += loss_lesion.item()
+                val_loss_style += loss_style.item()
                 # val_loss += loss_lesion.item()
-                val_dice += dice
+                # val_dice += dice
                 val_iou += iou
                 # val_precision += precision
                 # val_accuracy += accuracy
                 #统计训练loss
-                val_step += 1
         # 分别求出整个epoch的训练loss以及验证指标
-        train_loss /= train_step
-        train_iou /= train_step
-        val_loss /= val_step
-        val_dice /= val_step
-        val_iou /= val_step
+        train_loss /= len(train_loader)
+        train_iou /= len(train_loader)
+        train_loss_style /= len(train_loader)
+        train_loss_lesion /= len(train_loader)
+
+
+        val_loss /= len(valid_loader)
+        val_loss_style /= len(valid_loader)
+        val_loss_lesion /= len(valid_loader)
+        # val_dice /= len(valid_loader)
+        val_iou /= len(valid_loader)
         if(epoch % 10 == 0):
             print(f'{epoch+1}epoch predicted')
             predict_test(f'epoch_{epoch+1}', config.DDR_ROOT_DIR + config.DDR_TEST_IMG + '/007-4679-200.jpg', model)
-        # val_precision /= val_step
-        # val_accuracy /= val_step
+        # val_precision /= len(valid_loader)
+        # val_accuracy /= len(valid_loader)
         # print(f"\n[Epoch {epoch+1}/{epochs}] [Train Loss: {train_loss}] [Valid Loss: {val_loss}] [Lesion Accuracy: {val_accuracy}] [Lesion Precision: {val_precision}] ")
         # print(f"\n[Epoch {epoch+1}/{epochs}] [Train Loss: {train_loss}] [Valid Loss: {val_loss}] [Valid Lesion Dice: {val_dice}] [Valid Lesion IOU: {val_iou}]")
         # print(f"\n[Epoch {epoch+1}/{epochs}] [Train Loss: {train_loss}] [Valid Loss: {val_loss}] [Valid Lesion IOU: {val_iou}]")
@@ -178,36 +195,42 @@ def train(model, train_loader, valid_loader, style_loss, lesion_loss, ref_img, o
         optimizer.zero_grad(set_to_none=True)
         torch.cuda.empty_cache()
         # scheduler.step(val_loss)
-        logger.info(f"\n[Epoch {epoch+1}/{epochs}] [Train Loss: {train_loss}] [Train IoU: {train_iou}] [Valid Loss: {val_loss}] [Valid Lesion IoU: {val_iou}]")
+        logger.info(f"\n[Epoch {epoch+1}/{epochs}]" + 
+                    f" \n[Train Loss: {train_loss}] [Train_Style_Loss: {train_loss_style}] [Train_Lesion_Loss: {train_loss_lesion}] [Train IoU: {train_iou}]" + 
+                    f" \n[Valid Loss: {val_loss}] [Valid_Style_Loss: {val_loss_style}] [Valid_Lesion_Loss: {val_loss_lesion}] [Valid Lesion IoU: {val_iou}]")
 
         # print("drawing roc curve")
-        # if(epoch+1 >= 50 and epoch+1 % 25 ==0):
+        if((epoch+1) >= 50 and (epoch+1) % 25 ==0):
         # if((epoch+1) % 5 == 0 or epoch == 0):
-        #     print("begin cal roc")
-        #     fpr, tpr, roc_auc = utils.calculate_roc(model, valid_loader)
-        #     # 画ROC曲线
-        #     plt.figure()
-        #     lw = 2  # 线宽
-        #     plt.plot(fpr, tpr, color='darkorange',
-        #      lw=lw, label='ROC curve (AUC = %0.2f)' % roc_auc)  # 绘制ROC曲线
-        #     plt.plot([0, 1], [0, 1], color='navy', lw=lw, linestyle='--')  # 绘制对角线
-        #     plt.xlim([0.0, 1.0])  # x轴的范围
-        #     plt.ylim([0.0, 1.05])  # y轴的范围
-        #     plt.xlabel('False Positive Rate')  # x轴的标签
-        #     plt.ylabel('True Positive Rate')  # y轴的标签
-        #     plt.title('Receiver operating characteristic example')  # 标题
-        #     plt.legend(loc="lower right")  # 图例
-        #     # plt.show()  # 展
-        #     # plt.draw()
-        #     plt.savefig(f"./result/roc/epoch_{epoch+1}.jpeg")
-        #     print("roc done")
+            logger.info(f"epoch {epoch+1} drawing roc curve")
+            fpr, tpr, roc_auc = utils.calculate_roc(model, valid_loader)
+            # 画ROC曲线
+            plt.figure()
+            lw = 2  # 线宽
+            plt.plot(fpr, tpr, color='darkorange',
+             lw=lw, label='ROC curve (AUC = %0.2f)' % roc_auc)  # 绘制ROC曲线
+            plt.plot([0, 1], [0, 1], color='navy', lw=lw, linestyle='--')  # 绘制对角线
+            plt.xlim([0.0, 1.0])  # x轴的范围
+            plt.ylim([0.0, 1.05])  # y轴的范围
+            plt.xlabel('False Positive Rate')  # x轴的标签
+            plt.ylabel('True Positive Rate')  # y轴的标签
+            plt.title('Receiver operating characteristic example')  # 标题
+            plt.legend(loc="lower right")  # 图例
+            # plt.show()  # 展
+            # plt.draw()
+            plt.savefig(f"./result/roc/epoch_{epoch+1}.jpeg")
+            print("roc done")
 
         #tensorboard添加监视值
         writer.add_scalar('Loss/train', train_loss, epoch)
+        writer.add_scalar('Loss/train_lesion', train_loss_lesion, epoch)
+        writer.add_scalar('Loss/train_style', train_loss_style, epoch)
         writer.add_scalar('Loss/valid', val_loss, epoch)
+        writer.add_scalar('Loss/valid_lesion', val_loss_lesion, epoch)
+        writer.add_scalar('Loss/valid_style', val_loss_style, epoch)
         writer.add_scalar('IoU/train', train_iou, epoch)
         writer.add_scalar('IoU/valid', val_iou, epoch)
-        writer.close()
+        # writer.flush()
         # logger.info(f"\n[Epoch {epoch+1}/{epochs}] [Train Loss: {train_loss}] ")
         # 如果验证指标比最优值更好，那么保存当前模型参数
         if val_loss < best_score:
@@ -243,3 +266,4 @@ if __name__ == '__main__':
     # plt.savefig('ref.jpg')
 
     train(net, DDR_train_loader, DDR_valid_loader, style_loss, bce_loss, ref_img_tensor, optimizer, scheduler, config.NUM_EPOCHS)
+    writer.close()

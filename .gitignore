@@ -1,16 +1,24 @@
 *.jpg
-/__pycache__/
 *.jpeg
 *.png
 *.zip
 *.pth
 *.pyc
 *.log
+*.7z
+*.zip
+/__pycache__/
 /.vscode/
 /log/
-/runs/
+/runs_11/
+/new_runs/
 /result/cv2/
 /result/plt/
 /result/label_test/
 
 config.py
+Digraph.gv
+Digraph.gv.pdf
+__pycache__/config.cpython-38.pyc
+__pycache__/dataloader.cpython-38.pyc
+log/exp.log

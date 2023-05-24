@@ -12,7 +12,8 @@ RESIZE_SIZE = 768 or 512
 ### 数据增强参数
 transform_args = albumentations.Compose([
     albumentations.Resize(512, 512), 
-    albumentations.RandomCrop(448, 448),
+    # albumentations.RandomCrop(448, 448),
+    albumentations.RandomCrop(224, 224),
     albumentations.CLAHE(),  
     albumentations.OneOf([
         albumentations.HorizontalFlip(p=0.7),
