@@ -1,7 +1,7 @@
 import torch
 import numpy as np 
 import cv2
-from sklearn.metrics import roc_curve, auc
+from sklearn.metrics import roc_curve, auc, precision_recall_curve
 from sklearn.utils.multiclass import type_of_target
 import matplotlib.pyplot as plt
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -137,6 +137,34 @@ def calculate_roc(model, dataloader):
     roc_auc = auc(fpr, tpr)
 
     return fpr, tpr, roc_auc
+
+def calculate_pr(model, dataloader):
+    model.eval()
+    y_score = []
+    y_true = []
+    with torch.no_grad():
+        for inputs, labels in dataloader:
+            inputs = inputs.to(device)
+            inputs = inputs.float()
+            labels = labels.to(device)
+            labels = labels.float()
+            vsl_out, les_out = model(inputs)
+            y_score.append(les_out.cpu().numpy())
+            y_true.append(labels.cpu().numpy())
+
+    y_score = np.concatenate(y_score, axis=0)
+    y_true = np.concatenate(y_true, axis=0)
+    y_true = y_true.reshape(-1, 1)  #铺平
+    y_score = y_score.reshape(-1, 1)
+    print('y_score shape:', y_score.shape)
+    print('y_true shape:', y_true.shape)
+    y_score = y_score.tolist()  #转成list
+    y_true = y_true.tolist()
+    # print(type_of_target(y_score))
+    # print(type_of_target(y_true))
+    precision, recall, _ = precision_recall_curve(y_true, y_score)    
+
+    return precision, recall
 
 def roc_c(y_true, y_pred):
     y_true = y_true.cpu()

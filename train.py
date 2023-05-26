@@ -5,6 +5,7 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 import torch
 import torch.nn as nn
+import numpy as np
 from loss import DiceLoss, DiceBCELoss, BCELoss, StyleLoss
 import pytorch_ssim
 import PIL.Image as Image
@@ -47,8 +48,9 @@ def get_logger(filename, verbosity=1, name=None):
 # 部分全局对象
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # device = torch.device("cuda")
-print(f"current using device --- {device}")
-writer = SummaryWriter(log_dir=f"new_runs/0522_{config.NUM_EPOCHS}epochs")
+# print(f"current using device --- {device}")
+now_time = time.strftime("%m%d.%H.%M", time.localtime())
+writer = SummaryWriter(log_dir=f"new_runs/0526.15.30_{config.NUM_EPOCHS}epochs")
 # 判断能否使用自动混合精度
 # enable_amp = True if "cuda" in device.type else False
 # 在训练最开始之前实例化一个GradScaler对象
@@ -78,7 +80,7 @@ def train(model, train_loader, valid_loader, style_loss, lesion_loss, ref_img, o
 
     for epoch in range(epochs):
         epoch_start = time.time()
-        print(f"------------epoch{epoch+1}-----------------")
+        # print(f"------------epoch{epoch+1}-----------------")
         # print("Epoch:{}/{}".format(epoch+1, epochs))
         # print(train_loader.__len__())
 
@@ -114,6 +116,7 @@ def train(model, train_loader, valid_loader, style_loss, lesion_loss, ref_img, o
             # g = make_dot(model(inputs), params=dict(model.named_parameters()))        
             # g.view()
 
+            # print(les_out.shape)
             labels = utils.binarize(labels)
             loss_style = style_loss(vsl_out.unsqueeze(0), gram_matrix(ref_img))
             loss_lesion = lesion_loss(les_out, labels)
@@ -183,7 +186,7 @@ def train(model, train_loader, valid_loader, style_loss, lesion_loss, ref_img, o
         val_loss_lesion /= len(valid_loader)
         # val_dice /= len(valid_loader)
         val_iou /= len(valid_loader)
-        if(epoch % 10 == 0):
+        if(epoch % 50 == 0):
             print(f'{epoch+1}epoch predicted')
             predict_test(f'epoch_{epoch+1}', config.DDR_ROOT_DIR + config.DDR_TEST_IMG + '/007-4679-200.jpg', model)
         # val_precision /= len(valid_loader)
@@ -195,15 +198,20 @@ def train(model, train_loader, valid_loader, style_loss, lesion_loss, ref_img, o
         optimizer.zero_grad(set_to_none=True)
         torch.cuda.empty_cache()
         # scheduler.step(val_loss)
-        logger.info(f"\n[Epoch {epoch+1}/{epochs}]" + 
+        logger.info(f"\n\n[Epoch {epoch+1}/{epochs}]" + 
                     f" \n[Train Loss: {train_loss}] [Train_Style_Loss: {train_loss_style}] [Train_Lesion_Loss: {train_loss_lesion}] [Train IoU: {train_iou}]" + 
                     f" \n[Valid Loss: {val_loss}] [Valid_Style_Loss: {val_loss_style}] [Valid_Lesion_Loss: {val_loss_lesion}] [Valid Lesion IoU: {val_iou}]")
 
         # print("drawing roc curve")
-        if((epoch+1) >= 50 and (epoch+1) % 25 ==0):
-        # if((epoch+1) % 5 == 0 or epoch == 0):
+        # if((epoch+1) >= 50 and (epoch+1) % 25 ==0):
+        if((epoch+1) % 25 == 0):
             logger.info(f"epoch {epoch+1} drawing roc curve")
             fpr, tpr, roc_auc = utils.calculate_roc(model, valid_loader)
+            # precisoin, recall = utils.calculate_pr(model, valid_loader)
+            # # 使用tensorboard绘制roc曲线
+            # writer.add_pr_curve('pr_curve', precisoin, recall, global_step = epoch)
+            # writer.add_scalar('Curve/AP(average precision)', roc_auc, epoch)
+
             # 画ROC曲线
             plt.figure()
             lw = 2  # 线宽
@@ -218,7 +226,24 @@ def train(model, train_loader, valid_loader, style_loss, lesion_loss, ref_img, o
             plt.legend(loc="lower right")  # 图例
             # plt.show()  # 展
             # plt.draw()
-            plt.savefig(f"./result/roc/epoch_{epoch+1}.jpeg")
+            # plt_obj = plt.gcf()  # 获取当前figure
+            # # image = np.frombuffer(plt_obj.canvas.tostring_rgb(), dtype='uint8')  # 转换为numpy数组
+            # # image = image.reshape(plt_obj.canvas.get_width_height()[::-1] + (3,))  # 调整形状
+            # # 创建一个画布对象
+            # canvas = plt_obj.canvas
+            # # 将图像绘制到画布
+            # canvas.draw()
+            # # 获取画布上的像素数据
+            # width, height = plt_obj.canvas.get_width_height()
+            # image = np.frombuffer(plt_obj.canvas.tostring_rgb(), dtype='uint8').reshape(height, width, 3)
+
+            # writer.add_image('roc_curve', image)
+            # writer.add_scalar('Curve/ROC_AUC', roc_auc, epoch)
+            if(os.path.exists(f"./result/roc/{now_time}") == False):
+                os.makedirs(f"./result/roc/{now_time}")
+            plt.savefig(f"./result/roc/{now_time}/epoch_{epoch+1}.jpeg")
+            # writer.add_image('roc_curve', "./result/roc/epoch_5.jpeg")
+            writer.add_scalar('Curve/ROC_AUC', roc_auc, epoch)
             print("roc done")
 
         #tensorboard添加监视值

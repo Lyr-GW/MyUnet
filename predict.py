@@ -164,6 +164,30 @@ def test_uni(test_loader):
         plt.imshow(_labels)
         plt.savefig(f'./result/label_test/plt_{i}_les_n.jpg')
 
+def image_tensor2cv2(input_tensor: torch.Tensor):
+    """
+    将tensor保存为cv2格式
+    :param input_tensor: 要保存的tensor
+    :param filename: 保存的文件名
+    """
+    assert (len(input_tensor.shape) == 4 and input_tensor.shape[0] == 1)
+    # 复制一份
+    input_tensor = input_tensor.clone().detach()
+    # 到cpu
+    input_tensor = input_tensor.to(torch.device('cpu'))
+    # 反归一化
+    # input_tensor = unnormalize(input_tensor)
+    # 去掉批次维度
+    input_tensor = input_tensor.squeeze()
+    # 从[0,1]转化为[0,255]，再从CHW转为HWC，最后转为cv2
+    input_tensor = input_tensor.mul_(255).add_(0.5).clamp_(0, 255).permute(1, 2, 0).type(torch.uint8).numpy()
+    # RGB转BRG
+    input_cv2 = cv2.cvtColor(input_tensor, cv2.COLOR_RGB2BGR)
+    return input_cv2
+
+def image_cv2tensor(input_cv2):
+    input_tensor = torch.from_numpy(input_cv2)
+    return input_tensor
 
         
 iou = 0
@@ -204,16 +228,23 @@ def test(test_loader):
             # print(pred_lesion)
             # pred_lesion = utils.normalize(pred_lesion)
             # pred_lesion *= 255
-            print(pred_lesion)
-            pred_lesion = torch.squeeze(pred_lesion)                      # 将(batch、channel)维度去掉
+            # print(pred_lesion)
+            # pred_lesion = torch.squeeze(pred_lesion)                      # 将(batch)维度去掉
+            # print(type(pred_lesion))
+            # 转成cv2格式
+            pred_lesion_cv2 = image_tensor2cv2(pred_lesion)
+            pred_lesion_cv2[pred_lesion_cv2 < 128] = 0
+            pred_lesion_cv2[pred_lesion_cv2 >= 128] = 255
+            
+            pred_lesion_cv2 = cv2.cvtColor(pred_lesion_cv2, cv2.COLOR_RGB2GRAY) 
+
+            # 转成tensor格式
+            pred_lesion = image_cv2tensor(pred_lesion_cv2)
+
             pred_lesion = np.array(pred_lesion.data.cpu())                # 保存图片需要转为cpu处理
  
-            # pred_lesion[pred_lesion >=0.6 ] =255                            # 转为二值图片
-            # pred_lesion[pred_lesion < 0.6 ] =0
-            # print(pred_lesion)
- 
             pred_lesion = np.uint8(pred_lesion)                           # 转为图片的形式
-            # print(pred_lesion.shape)
+            # pred_lesion = np.transpose(pred_lesion, (1, 2, 0))
             cv2.imwrite(f'./result/cv2/{i}_les.png', pred_lesion)           # 保存图片
 
         
