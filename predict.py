@@ -189,6 +189,18 @@ def image_cv2tensor(input_cv2):
     input_tensor = torch.from_numpy(input_cv2)
     return input_tensor
 
+def processformat(input):
+    pred_cv2 = image_tensor2cv2(input)
+    # pred_cv2[pred_cv2 < 128] = 0
+    # pred_cv2[pred_cv2 >= 128] = 255
+    
+    pred_cv2 = cv2.cvtColor(pred_cv2, cv2.COLOR_RGB2GRAY) 
+
+    # 转成tensor格式
+    pred = image_cv2tensor(pred_cv2)
+    return pred
+
+    
         
 iou = 0
 test_iou = 0
@@ -231,21 +243,27 @@ def test(test_loader):
             # print(pred_lesion)
             # pred_lesion = torch.squeeze(pred_lesion)                      # 将(batch)维度去掉
             # print(type(pred_lesion))
-            # 转成cv2格式
-            pred_lesion_cv2 = image_tensor2cv2(pred_lesion)
-            pred_lesion_cv2[pred_lesion_cv2 < 128] = 0
-            pred_lesion_cv2[pred_lesion_cv2 >= 128] = 255
+            # # 转成cv2格式
+            # pred_lesion_cv2 = image_tensor2cv2(pred_lesion)
+            # pred_lesion_cv2[pred_lesion_cv2 < 128] = 0
+            # pred_lesion_cv2[pred_lesion_cv2 >= 128] = 255
             
-            pred_lesion_cv2 = cv2.cvtColor(pred_lesion_cv2, cv2.COLOR_RGB2GRAY) 
+            # pred_lesion_cv2 = cv2.cvtColor(pred_lesion_cv2, cv2.COLOR_RGB2GRAY) 
 
-            # 转成tensor格式
-            pred_lesion = image_cv2tensor(pred_lesion_cv2)
+            # # 转成tensor格式
+            # pred_lesion = image_cv2tensor(pred_lesion_cv2)
+
+            pred_lesion = processformat(pred_lesion)
+            pred_vsl = processformat(pred_vsl)
 
             pred_lesion = np.array(pred_lesion.data.cpu())                # 保存图片需要转为cpu处理
+            pred_vsl = np.array(pred_vsl.data.cpu())
  
             pred_lesion = np.uint8(pred_lesion)                           # 转为图片的形式
+            pred_vsl = np.uint8(pred_vsl)
             # pred_lesion = np.transpose(pred_lesion, (1, 2, 0))
-            cv2.imwrite(f'./result/cv2/{i}_les.png', pred_lesion)           # 保存图片
+            cv2.imwrite(f'./result/cv2/les_{i}.png', pred_lesion)           # 保存图片
+            cv2.imwrite(f'./result/cv2/vsl_{i}.png', pred_vsl)           # 保存图片
 
         
         test_iou /= test_step

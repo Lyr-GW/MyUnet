@@ -50,7 +50,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # device = torch.device("cuda")
 # print(f"current using device --- {device}")
 now_time = time.strftime("%m%d.%H.%M", time.localtime())
-writer = SummaryWriter(log_dir=f"new_runs/0526.15.30_{config.NUM_EPOCHS}epochs")
+writer = SummaryWriter(log_dir=f"new_runs/0531.11.43_{config.NUM_EPOCHS}epochs")
 # 判断能否使用自动混合精度
 # enable_amp = True if "cuda" in device.type else False
 # 在训练最开始之前实例化一个GradScaler对象
@@ -74,6 +74,9 @@ def gram_matrix(y):
 
 def train(model, train_loader, valid_loader, style_loss, lesion_loss, ref_img, optimizer, scheduler, epochs):
     best_score = 1.0
+    # multi loss weight
+    weight_style = 1
+    weight_lesion = 1
     logger = get_logger('./log/exp.log')
     logger.info('start logging...')
     optimizer.zero_grad()
@@ -130,7 +133,7 @@ def train(model, train_loader, valid_loader, style_loss, lesion_loss, ref_img, o
             # scaler.step(optimizer)
             # scaler.update()
 
-            loss = loss_style + loss_lesion
+            loss = weight_style * loss_style + weight_lesion * loss_lesion
             train_loss_style += loss_style
             train_loss_lesion += loss_lesion
 
